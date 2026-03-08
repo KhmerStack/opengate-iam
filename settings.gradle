@@ -1,0 +1,17 @@
+rootProject.name = 'opengate-iam'
+
+include(
+    'opengate-common',
+    'opengate-auth-service',
+    'opengate-user-service',
+    'opengate-realm-service',
+    'opengate-rbac-service',
+    'opengate-client-service',
+    'opengate-mfa-service',
+    'opengate-session-service',
+    'opengate-notification-service',
+    'opengate-admin-api',
+    'opengate-gateway',
+    'opengate-spring-boot-starter',
+    'opengate-sample-app'
+)

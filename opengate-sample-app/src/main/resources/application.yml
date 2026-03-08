@@ -1,0 +1,31 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: opengate-sample-app
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:9081/oauth2/jwks
+          issuer-uri: http://localhost:9080/realms/master
+
+# ──────────────────────────────────────────────────────────
+# OpenGate IAM — all you need (same as Keycloak adapter)
+# ──────────────────────────────────────────────────────────
+opengate:
+  server-url: http://localhost:9080
+  realm: master
+  resource: sample-app
+  public-client: false
+  public-paths:
+    - /api/public/**
+    - /actuator/health
+    - /actuator/info
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

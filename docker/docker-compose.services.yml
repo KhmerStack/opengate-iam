@@ -1,0 +1,90 @@
+version: '3.9'
+
+x-common-env: &common-env
+  SPRING_DATASOURCE_USERNAME: opengate
+  SPRING_DATASOURCE_PASSWORD: opengate_dev
+  SPRING_REDIS_HOST: redis
+  SPRING_REDIS_PORT: 6379
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+services:
+  opengate-auth-service:
+    build: ../opengate-auth-service
+    ports: ["8081:8081"]
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_auth
+
+  opengate-user-service:
+    build: ../opengate-user-service
+    ports: ["8082:8082"]
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_user
+
+  opengate-realm-service:
+    build: ../opengate-realm-service
+    ports: ["8083:8083"]
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_realm
+
+  opengate-rbac-service:
+    build: ../opengate-rbac-service
+    ports: ["8084:8084"]
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_rbac
+
+  opengate-client-service:
+    build: ../opengate-client-service
+    ports: ["8085:8085"]
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_client
+
+  opengate-mfa-service:
+    build: ../opengate-mfa-service
+    ports: ["8086:8086"]
+    environment:
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+
+  opengate-session-service:
+    build: ../opengate-session-service
+    ports: ["8087:8087"]
+    environment:
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+  opengate-notification-service:
+    build: ../opengate-notification-service
+    ports: ["8088:8088"]
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_notification
+
+  opengate-admin-api:
+    build: ../opengate-admin-api
+    ports: ["8089:8089"]
+    environment:
+      REALM_SERVICE_URL: http://opengate-realm-service:8083
+      USER_SERVICE_URL: http://opengate-user-service:8082
+      RBAC_SERVICE_URL: http://opengate-rbac-service:8084
+      CLIENT_SERVICE_URL: http://opengate-client-service:8085
+      SESSION_SERVICE_URL: http://opengate-session-service:8087
+
+  opengate-gateway:
+    build: ../opengate-gateway
+    ports: ["8080:8080"]
+    environment:
+      AUTH_SERVICE_URL: http://opengate-auth-service:8081
+      USER_SERVICE_URL: http://opengate-user-service:8082
+      REALM_SERVICE_URL: http://opengate-realm-service:8083
+      RBAC_SERVICE_URL: http://opengate-rbac-service:8084
+      CLIENT_SERVICE_URL: http://opengate-client-service:8085
+      MFA_SERVICE_URL: http://opengate-mfa-service:8086
+      SESSION_SERVICE_URL: http://opengate-session-service:8087
+      ADMIN_API_URL: http://opengate-admin-api:8089
+      SPRING_REDIS_HOST: redis

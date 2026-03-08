@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>New Login Alert</title></head>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:#0D1B2A;padding:20px;border-radius:8px 8px 0 0;">
+    <h1 style="color:#00B4D8;margin:0;">OpenGate IAM</h1>
+  </div>
+  <div style="background:#f9f9f9;padding:30px;border-radius:0 0 8px 8px;">
+    <h2>New Login Detected</h2>
+    <p>A new login from an unrecognized device was detected.</p>
+    <table style="width:100%;border-collapse:collapse;">
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;"><strong>IP</strong></td><td th:text="${ipAddress}" style="padding:8px;border-bottom:1px solid #eee;">0.0.0.0</td></tr>
+      <tr><td style="padding:8px;"><strong>Time</strong></td><td th:text="${loginTime}" style="padding:8px;">Now</td></tr>
+    </table>
+    <p>If this was not you, change your password immediately.</p>
+  </div>
+</body>
+</html>

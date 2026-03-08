@@ -1,0 +1,337 @@
+# ──────────────────────────────────────────────────────────────
+# OpenGate IAM — Full Stack
+#
+# Usage:
+#   docker compose up --build          # first run
+#   docker compose up -d               # background
+#   docker compose down -v             # stop + wipe volumes
+#
+# Config: edit .env to change DOMAIN / PROTOCOL
+# ──────────────────────────────────────────────────────────────
+
+x-backend-env: &backend-env
+  SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opengate}
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-opengate_dev}
+  SPRING_REDIS_HOST: redis
+  SPRING_REDIS_PORT: 6379
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+services:
+
+  # ── Infrastructure ─────────────────────────────────────────
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-opengate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opengate_dev}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-opengate}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [opengate-net]
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [opengate-net]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - "9092:29092"
+    networks: [opengate-net]
+
+  # ── Backend Services ───────────────────────────────────────
+
+  opengate-auth-service:
+    build:
+      context: .
+      dockerfile: opengate-auth-service/Dockerfile
+    ports:
+      - "9081:8080"
+    environment:
+      <<: *backend-env
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_auth
+      OPENGATE_ISSUER_URI: ${PROTOCOL:-http}://${DOMAIN:-localhost}:9081
+      OPENGATE_CONSOLE_REDIRECT_URI: ${PROTOCOL:-http}://${DOMAIN:-localhost}:3002/callback
+      OPENGATE_SAMPLE_APP_REDIRECT_URI: ${PROTOCOL:-http}://${DOMAIN:-localhost}:3003/callback
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-user-service:
+    build:
+      context: .
+      dockerfile: opengate-user-service/Dockerfile
+    ports:
+      - "9082:8080"
+    environment:
+      <<: *backend-env
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_user
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-realm-service:
+    build:
+      context: .
+      dockerfile: opengate-realm-service/Dockerfile
+    ports:
+      - "9083:8080"
+    environment:
+      <<: *backend-env
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_realm
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-rbac-service:
+    build:
+      context: .
+      dockerfile: opengate-rbac-service/Dockerfile
+    ports:
+      - "9084:8080"
+    environment:
+      <<: *backend-env
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_rbac
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-client-service:
+    build:
+      context: .
+      dockerfile: opengate-client-service/Dockerfile
+    ports:
+      - "9085:8080"
+    environment:
+      <<: *backend-env
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_client
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-mfa-service:
+    build:
+      context: .
+      dockerfile: opengate-mfa-service/Dockerfile
+    ports:
+      - "9086:8080"
+    environment:
+      SERVER_PORT: 8080
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-session-service:
+    build:
+      context: .
+      dockerfile: opengate-session-service/Dockerfile
+    ports:
+      - "9087:8080"
+    environment:
+      SERVER_PORT: 8080
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-notification-service:
+    build:
+      context: .
+      dockerfile: opengate-notification-service/Dockerfile
+    ports:
+      - "9088:8080"
+    environment:
+      <<: *backend-env
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opengate_notification
+      SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-admin-api:
+    build:
+      context: .
+      dockerfile: opengate-admin-api/Dockerfile
+    ports:
+      - "9089:8080"
+    environment:
+      SERVER_PORT: 8080
+      REALM_SERVICE_URL: http://opengate-realm-service:8080
+      USER_SERVICE_URL: http://opengate-user-service:8080
+      RBAC_SERVICE_URL: http://opengate-rbac-service:8080
+      CLIENT_SERVICE_URL: http://opengate-client-service:8080
+      SESSION_SERVICE_URL: http://opengate-session-service:8080
+    depends_on:
+      - opengate-realm-service
+      - opengate-user-service
+      - opengate-rbac-service
+      - opengate-client-service
+      - opengate-session-service
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-gateway:
+    build:
+      context: .
+      dockerfile: opengate-gateway/Dockerfile
+    ports:
+      - "9080:8080"
+    environment:
+      SERVER_PORT: 8080
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      AUTH_SERVICE_URL: http://opengate-auth-service:8080
+      USER_SERVICE_URL: http://opengate-user-service:8080
+      REALM_SERVICE_URL: http://opengate-realm-service:8080
+      RBAC_SERVICE_URL: http://opengate-rbac-service:8080
+      CLIENT_SERVICE_URL: http://opengate-client-service:8080
+      MFA_SERVICE_URL: http://opengate-mfa-service:8080
+      SESSION_SERVICE_URL: http://opengate-session-service:8080
+      ADMIN_API_URL: http://opengate-admin-api:8080
+      CORS_ORIGIN_0: ${PROTOCOL:-http}://${DOMAIN:-localhost}:3000
+      CORS_ORIGIN_1: ${PROTOCOL:-http}://${DOMAIN:-localhost}:3001
+      CORS_ORIGIN_2: ${PROTOCOL:-http}://${DOMAIN:-localhost}:3002
+      CORS_ORIGIN_3: ${PROTOCOL:-http}://${DOMAIN:-localhost}:3003
+    depends_on:
+      redis:
+        condition: service_healthy
+      opengate-auth-service:
+        condition: service_started
+      opengate-user-service:
+        condition: service_started
+      opengate-realm-service:
+        condition: service_started
+      opengate-rbac-service:
+        condition: service_started
+      opengate-client-service:
+        condition: service_started
+      opengate-mfa-service:
+        condition: service_started
+      opengate-session-service:
+        condition: service_started
+      opengate-admin-api:
+        condition: service_started
+    networks: [opengate-net]
+    restart: on-failure
+
+  opengate-sample-app:
+    build:
+      context: .
+      dockerfile: opengate-sample-app/Dockerfile
+    ports:
+      - "8090:8080"
+    environment:
+      SERVER_PORT: 8080
+      OPENGATE_SERVER_URL: http://opengate-gateway:8080
+      # JWK fetched directly from auth service (no gateway hop needed)
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://opengate-auth-service:8080/oauth2/jwks
+      # Issuer must match what auth-service puts in the iss claim
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: ${PROTOCOL:-http}://${DOMAIN:-localhost}:9080
+    depends_on:
+      - opengate-gateway
+    networks: [opengate-net]
+    restart: on-failure
+
+  # ── Frontend Apps ──────────────────────────────────────────
+
+  opengate-console:
+    build:
+      context: ./opengate-console
+      args:
+        NEXT_PUBLIC_API_URL: ${PROTOCOL:-http}://${DOMAIN:-localhost}:9080
+    ports:
+      - "3002:3000"
+    networks: [opengate-net]
+
+  opengate-docs:
+    build:
+      context: ./opengate-docs
+    ports:
+      - "3001:3001"
+    networks: [opengate-net]
+
+  opengate-sample-frontend:
+    build:
+      context: ./opengate-sample-frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PROTOCOL:-http}://${DOMAIN:-localhost}:9080
+    ports:
+      - "3003:3003"
+    networks: [opengate-net]
+
+networks:
+  opengate-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

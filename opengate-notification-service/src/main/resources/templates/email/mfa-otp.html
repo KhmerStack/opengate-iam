@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Your OTP Code</title></head>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:#0D1B2A;padding:20px;border-radius:8px 8px 0 0;">
+    <h1 style="color:#00B4D8;margin:0;">OpenGate IAM</h1>
+  </div>
+  <div style="background:#f9f9f9;padding:30px;border-radius:0 0 8px 8px;">
+    <h2>Your One-Time Password</h2>
+    <div style="background:#fff;border:2px solid #00B4D8;border-radius:8px;padding:20px;text-align:center;margin:20px 0;">
+      <span th:text="${otp}" style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#0D1B2A;">000000</span>
+    </div>
+    <p>This code expires in 10 minutes.</p>
+  </div>
+</body>
+</html>

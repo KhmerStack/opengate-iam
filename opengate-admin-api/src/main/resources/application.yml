@@ -1,0 +1,28 @@
+server:
+  port: 9089
+
+spring:
+  application:
+    name: opengate-admin-api
+  main:
+    web-application-type: servlet
+
+opengate:
+  services:
+    realm-service: ${REALM_SERVICE_URL:http://localhost:9083}
+    user-service: ${USER_SERVICE_URL:http://localhost:9082}
+    rbac-service: ${RBAC_SERVICE_URL:http://localhost:9084}
+    client-service: ${CLIENT_SERVICE_URL:http://localhost:9085}
+    session-service: ${SESSION_SERVICE_URL:http://localhost:9087}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

@@ -1,0 +1,89 @@
+server:
+  port: 9080
+
+spring:
+  application:
+    name: opengate-gateway
+  main:
+    web-application-type: reactive
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "${CORS_ORIGIN_0:http://localhost:3000}"
+              - "${CORS_ORIGIN_1:http://localhost:3001}"
+              - "${CORS_ORIGIN_2:http://localhost:3002}"
+              - "${CORS_ORIGIN_3:http://localhost:3003}"
+            allowedMethods: [GET, POST, PUT, DELETE, OPTIONS, PATCH]
+            allowedHeaders: ["*"]
+            allowCredentials: true
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://localhost:9081}
+          predicates:
+            - Path=/realms/**
+
+        - id: jwks
+          uri: ${AUTH_SERVICE_URL:http://localhost:9081}
+          predicates:
+            - Path=/oauth2/jwks
+
+        - id: user-service
+          uri: ${USER_SERVICE_URL:http://localhost:9082}
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - StripPrefix=1
+
+        - id: rbac-service
+          uri: ${RBAC_SERVICE_URL:http://localhost:9084}
+          predicates:
+            - Path=/api/roles/**
+          filters:
+            - StripPrefix=1
+
+        - id: rbac-service-realms
+          uri: ${RBAC_SERVICE_URL:http://localhost:9084}
+          predicates:
+            - Path=/api/realms/*/roles,/api/realms/*/roles/**,/api/realms/*/users/*/role-mappings
+          filters:
+            - StripPrefix=1
+
+        - id: client-service
+          uri: ${CLIENT_SERVICE_URL:http://localhost:9085}
+          predicates:
+            - Path=/api/clients/**,/api/realms/*/clients,/api/realms/*/clients/**
+          filters:
+            - StripPrefix=1
+
+        - id: mfa-service
+          uri: ${MFA_SERVICE_URL:http://localhost:9086}
+          predicates:
+            - Path=/api/mfa/**
+          filters:
+            - StripPrefix=1
+
+        - id: session-service
+          uri: ${SESSION_SERVICE_URL:http://localhost:9087}
+          predicates:
+            - Path=/api/sessions/**
+          filters:
+            - StripPrefix=1
+
+        - id: admin-api
+          uri: ${ADMIN_API_URL:http://localhost:9089}
+          predicates:
+            - Path=/admin/**
+
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6380}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway

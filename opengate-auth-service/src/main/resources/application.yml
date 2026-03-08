@@ -1,0 +1,33 @@
+server:
+  port: 9081
+
+spring:
+  application:
+    name: opengate-auth-service
+  security:
+    oauth2:
+      authorizationserver:
+        issuer: ${OPENGATE_ISSUER_URI:http://localhost:9080}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/opengate_auth}
+    username: ${SPRING_DATASOURCE_USERNAME:opengate}
+    password: ${SPRING_DATASOURCE_PASSWORD:opengate_dev}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

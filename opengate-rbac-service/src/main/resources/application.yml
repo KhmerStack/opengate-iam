@@ -1,0 +1,26 @@
+server:
+  port: 9084
+
+spring:
+  application:
+    name: opengate-rbac-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/opengate_rbac}
+    username: ${SPRING_DATASOURCE_USERNAME:opengate}
+    password: ${SPRING_DATASOURCE_PASSWORD:opengate_dev}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
